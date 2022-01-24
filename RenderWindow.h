@@ -72,6 +72,9 @@ class RenderWindow : public QWidget
     QLabel                      *zoomLabel;
 	QLabel						*vertexSizeLabel;
 	
+    // subdivide controls
+    QPushButton                 *subdivideButton;
+
     public:
     // constructor
     RenderWindow

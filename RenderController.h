@@ -86,6 +86,9 @@ class RenderController : public QObject
     void MouseDrag(int x, int y);
     void MouseUp(int x, int y);
 
+    // subdivision
+    void subdivideClicked();
+
     }; // class RenderController
 
 // end of include guard

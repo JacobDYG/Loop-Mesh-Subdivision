@@ -77,10 +77,13 @@ RenderWindow::RenderWindow
     zoomLabel                   = new QLabel                    ("Zm",                  this);
     vertexSizeLabel				= new QLabel					("Vertex Size",			this);
     
+    // subdivision controls
+    subdivideButton             = new QPushButton               ("Subdivide",           this);
+
     // add all of the widgets to the grid               Row         Column      Row Span    Column Span
     
     // the top two widgets have to fit to the widgets stack between them
-    int nStacked = 6;
+    int nStacked = 7;
     
     windowLayout->addWidget(renderWidget,               0,          1,          nStacked,   1           );
     windowLayout->addWidget(yTranslateSlider,           0,          2,          nStacked,   1           );
@@ -103,6 +106,9 @@ RenderWindow::RenderWindow
     // Vertex Size slider row
     windowLayout->addWidget(vertexSizeSlider,			nStacked+1,	1,			1,			1			);
     windowLayout->addWidget(vertexSizeLabel,			nStacked+1,	3,			1,			1			);
+
+    // subdivide controls
+    windowLayout->addWidget(subdivideButton,            6,          3,          1,          1           );
     
     // now reset all of the control elements to match the render parameters passed in
     ResetInterface();

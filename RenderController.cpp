@@ -79,6 +79,10 @@ RenderController::RenderController
     QObject::connect(   renderWindow->showVerticesBox, 		        SIGNAL(stateChanged(int)),
                         this,                                       SLOT(showVerticesCheckChanged(int)));
 
+    // subdivision
+    QObject::connect(   renderWindow->subdivideButton,              SIGNAL(clicked()),
+                        this,                                       SLOT(subdivideClicked()));
+
     // copy the rotation matrix from the widgets to the model
     renderParameters->rotationMatrix = renderWindow->modelRotator->RotationMatrix();
     renderParameters->lightMatrix = renderWindow->lightRotator->RotationMatrix();
@@ -200,3 +204,8 @@ void RenderController::MouseDrag(int x, int y)
 void RenderController::MouseUp(int x, int y)
     { // RenderController::MouseUp()
     } // RenderController::MouseUp()
+
+// Perform subdivision
+void RenderController::subdivideClicked()
+{
+}
