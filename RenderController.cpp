@@ -208,4 +208,132 @@ void RenderController::MouseUp(int x, int y)
 // Perform subdivision
 void RenderController::subdivideClicked()
 {
+    // The plan is to take the number of vertices at each iteration, and consider all vertices with an index below this to be original vertices.
+
+    // Firstly, split all edges
+    // 1. Loop through all edges somehow
+    // 2. Insert a new vertex halfway across the edge. New vertices are to be added to the end of vertices.
+    std::vector<int> divided;
+    divided.resize(directedEdgeSurface->otherHalf.size(), -1);
+
+    /*for (size_t halfEdgeIndex = 0; halfEdgeIndex < directedEdgeSurface->otherHalf.size(); halfEdgeIndex++)
+    {
+        if (!visited[halfEdgeIndex])
+        {
+            visited[directedEdgeSurface->otherHalf[halfEdgeIndex]] = true;
+            visited[halfEdgeIndex] = true;
+
+            std::cout << "Edge between " 
+                << directedEdgeSurface->faceVertices[halfEdgeIndex] 
+                << " and " << directedEdgeSurface->faceVertices[directedEdgeSurface->otherHalf[halfEdgeIndex]]
+                << std::endl;
+
+            // Split the edge
+            // Create a new vertex
+            Cartesian3 newVertex = directedEdgeSurface->vertices[directedEdgeSurface->faceVertices[halfEdgeIndex]] * 0.5
+                                    + directedEdgeSurface->vertices[directedEdgeSurface->faceVertices[directedEdgeSurface->otherHalf[halfEdgeIndex]]] * 0.5;
+
+            directedEdgeSurface->vertices.push_back(newVertex);
+
+            // Update this edge and its other half to point to the new vertex
+            // Other half first
+            unsigned int originalOtherHalfIndex = directedEdgeSurface->otherHalf[halfEdgeIndex];
+            directedEdgeSurface->otherHalf[originalOtherHalfIndex] = directedEdgeSurface->vertices.size() - 1;
+            // Now this
+            directedEdgeSurface->otherHalf[halfEdgeIndex] = directedEdgeSurface->vertices.size() - 1;
+
+            // Other halves from the new vertex
+
+
+            // Create two new half edges to point away from the new vertex
+
+            // Add fde's for the new vertices
+        }
+    }*/
+
+    unsigned int startVerticesLength = directedEdgeSurface->vertices.size();
+    size_t startFaceLength = directedEdgeSurface->faceVertices.size();
+
+    // Loop through all the faces. Subdivide all at once.
+    for (size_t faceIndex = 0; faceIndex < startFaceLength; faceIndex+=3)
+    {
+        // Copy the current face vertex indices
+        unsigned int startVertAIndex = directedEdgeSurface->faceVertices[faceIndex];
+        unsigned int startVertBIndex = directedEdgeSurface->faceVertices[faceIndex + 1];
+        unsigned int startVertCIndex = directedEdgeSurface->faceVertices[faceIndex + 2];
+        
+        // Create 3 new vertices and corresponding normals
+        Cartesian3 vertAB = directedEdgeSurface->vertices[startVertAIndex] * 0.5 
+                            + directedEdgeSurface->vertices[startVertBIndex] * 0.5;
+        Cartesian3 normAB = directedEdgeSurface->normals[startVertAIndex] * 0.5
+                            + directedEdgeSurface->normals[startVertBIndex] * 0.5;
+
+        Cartesian3 vertBC = directedEdgeSurface->vertices[startVertBIndex] * 0.5
+                            + directedEdgeSurface->vertices[startVertCIndex] * 0.5;
+        Cartesian3 normBC = directedEdgeSurface->normals[startVertBIndex] * 0.5
+                            + directedEdgeSurface->normals[startVertCIndex] * 0.5;
+
+        Cartesian3 vertAC = directedEdgeSurface->vertices[startVertAIndex] * 0.5 
+                            + directedEdgeSurface->vertices[startVertCIndex] * 0.5;
+        Cartesian3 normAC = directedEdgeSurface->normals[startVertAIndex] * 0.5
+                            + directedEdgeSurface->normals[startVertCIndex] * 0.5;
+
+        // Add the vertices, or get indices of already placed
+        unsigned int    vertABIndex = divided[faceIndex],
+                        vertBCIndex = divided[faceIndex + 1],
+                        vertACIndex = divided[faceIndex + 2];
+        
+        if (vertABIndex == -1)
+        {
+            directedEdgeSurface->vertices.push_back(vertAB);
+            directedEdgeSurface->normals.push_back(normAB);
+            vertABIndex = directedEdgeSurface->vertices.size() - 1;
+        }
+        if (vertBCIndex == -1)
+        {
+            directedEdgeSurface->vertices.push_back(vertBC);
+            directedEdgeSurface->normals.push_back(normBC);
+            vertBCIndex = directedEdgeSurface->vertices.size() - 1;
+        }
+        if (vertACIndex == -1)
+        {
+            directedEdgeSurface->vertices.push_back(vertAC);
+            directedEdgeSurface->normals.push_back(normAC);
+            vertACIndex = directedEdgeSurface->vertices.size() - 1;
+        }
+
+        // Flag that these were divided, with the indices of the new vertices
+        divided[faceIndex] = vertABIndex;
+        divided[faceIndex + 1] = vertBCIndex;
+        divided[faceIndex + 2] = vertACIndex;
+
+        // Change the face vertex indices to the new vertices
+        directedEdgeSurface->faceVertices[faceIndex + 0] = vertABIndex;    // Subtraction from 1 to 3 to avoud going beyond the array
+        directedEdgeSurface->faceVertices[faceIndex + 1] = vertBCIndex;
+        directedEdgeSurface->faceVertices[faceIndex + 2] = vertACIndex;
+
+        // Create 3 new faces at the end of the face array
+        // First face, from original vertex A
+        directedEdgeSurface->faceVertices.push_back(startVertAIndex);
+        directedEdgeSurface->faceVertices.push_back(vertABIndex);   // Vertex on edge AB
+        directedEdgeSurface->faceVertices.push_back(vertACIndex);   // Vertex on edge AC
+        // Second face, from original vertex B
+        directedEdgeSurface->faceVertices.push_back(startVertBIndex);
+        directedEdgeSurface->faceVertices.push_back(vertBCIndex);   // Vertex on edge BC
+        directedEdgeSurface->faceVertices.push_back(vertABIndex);   // Vertex on edge AB
+        // Third face, from original vertex C
+        directedEdgeSurface->faceVertices.push_back(startVertCIndex);
+        directedEdgeSurface->faceVertices.push_back(vertACIndex);   // Vertex on edge AC
+        directedEdgeSurface->faceVertices.push_back(vertBCIndex);   // Vertex on edge BC
+
+        // Create half edges for the new faces
+        // 3 per face- expand by 9 as 3 halfedges will be updated
+        directedEdgeSurface->otherHalf.resize(directedEdgeSurface->otherHalf.size() + 9, -1);
+
+        // Update existing half edges to be on the central face
+
+        // Create new half edges to represent the split edge
+
+        // Move the existing half edges 
+    }
 }
