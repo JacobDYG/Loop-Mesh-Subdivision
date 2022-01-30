@@ -80,6 +80,9 @@ RenderWindow::RenderWindow
     // subdivision controls
     subdivideButton             = new QPushButton               ("Subdivide",           this);
 
+    // writeout
+    writeButton                 = new QPushButton               ("Save",                this);
+
     // add all of the widgets to the grid               Row         Column      Row Span    Column Span
     
     // the top two widgets have to fit to the widgets stack between them
@@ -109,6 +112,9 @@ RenderWindow::RenderWindow
 
     // subdivide controls
     windowLayout->addWidget(subdivideButton,            6,          3,          1,          1           );
+
+    // writeout
+    windowLayout->addWidget(writeButton,                7,          3,          1,          1           );
     
     // now reset all of the control elements to match the render parameters passed in
     ResetInterface();

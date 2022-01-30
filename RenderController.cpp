@@ -19,6 +19,7 @@
 
 #include "RenderController.h"
 #include <stdio.h>
+#include <fstream>
 
 // constructor
 RenderController::RenderController
@@ -82,6 +83,10 @@ RenderController::RenderController
     // subdivision
     QObject::connect(   renderWindow->subdivideButton,              SIGNAL(clicked()),
                         this,                                       SLOT(subdivideClicked()));
+
+    // writeout
+    QObject::connect(   renderWindow->writeButton,                  SIGNAL(clicked()),
+                        this,                                       SLOT(writeClicked()));
 
     // copy the rotation matrix from the widgets to the model
     renderParameters->rotationMatrix = renderWindow->modelRotator->RotationMatrix();
@@ -216,49 +221,13 @@ void RenderController::subdivideClicked()
     std::vector<int> divided;
     divided.resize(directedEdgeSurface->otherHalf.size(), -1);
 
-    /*for (size_t halfEdgeIndex = 0; halfEdgeIndex < directedEdgeSurface->otherHalf.size(); halfEdgeIndex++)
-    {
-        if (!visited[halfEdgeIndex])
-        {
-            visited[directedEdgeSurface->otherHalf[halfEdgeIndex]] = true;
-            visited[halfEdgeIndex] = true;
-
-            std::cout << "Edge between " 
-                << directedEdgeSurface->faceVertices[halfEdgeIndex] 
-                << " and " << directedEdgeSurface->faceVertices[directedEdgeSurface->otherHalf[halfEdgeIndex]]
-                << std::endl;
-
-            // Split the edge
-            // Create a new vertex
-            Cartesian3 newVertex = directedEdgeSurface->vertices[directedEdgeSurface->faceVertices[halfEdgeIndex]] * 0.5
-                                    + directedEdgeSurface->vertices[directedEdgeSurface->faceVertices[directedEdgeSurface->otherHalf[halfEdgeIndex]]] * 0.5;
-
-            directedEdgeSurface->vertices.push_back(newVertex);
-
-            // Update this edge and its other half to point to the new vertex
-            // Other half first
-            unsigned int originalOtherHalfIndex = directedEdgeSurface->otherHalf[halfEdgeIndex];
-            directedEdgeSurface->otherHalf[originalOtherHalfIndex] = directedEdgeSurface->vertices.size() - 1;
-            // Now this
-            directedEdgeSurface->otherHalf[halfEdgeIndex] = directedEdgeSurface->vertices.size() - 1;
-
-            // Other halves from the new vertex
-
-
-            // Create two new half edges to point away from the new vertex
-
-            // Add fde's for the new vertices
-        }
-    }*/
-
-    unsigned int startVerticesLength = directedEdgeSurface->vertices.size();
     size_t startFaceLength = directedEdgeSurface->faceVertices.size();
 
     // Loop through all the faces. Subdivide all at once.
     for (size_t faceIndex = 0; faceIndex < startFaceLength; faceIndex+=3)
     {
         // Copy the current face vertex indices
-        unsigned int startVertAIndex = directedEdgeSurface->faceVertices[faceIndex];
+        unsigned int startVertAIndex = directedEdgeSurface->faceVertices[faceIndex + 0];
         unsigned int startVertBIndex = directedEdgeSurface->faceVertices[faceIndex + 1];
         unsigned int startVertCIndex = directedEdgeSurface->faceVertices[faceIndex + 2];
         
@@ -279,10 +248,33 @@ void RenderController::subdivideClicked()
                             + directedEdgeSurface->normals[startVertCIndex] * 0.5;
 
         // Add the vertices, or get indices of already placed
-        unsigned int    vertABIndex = divided[faceIndex],
-                        vertBCIndex = divided[faceIndex + 1],
-                        vertACIndex = divided[faceIndex + 2];
-        
+        int vertABIndex, vertBCIndex, vertACIndex;
+
+        std::vector<Cartesian3>::iterator it;
+        int index;
+
+        it = std::find(directedEdgeSurface->vertices.begin(), directedEdgeSurface->vertices.end(), vertAB);
+        index = it - directedEdgeSurface->vertices.begin();
+        if (it == directedEdgeSurface->vertices.end())
+            vertABIndex = -1;
+        else
+            vertABIndex = index;
+
+        it = std::find(directedEdgeSurface->vertices.begin(), directedEdgeSurface->vertices.end(), vertBC);
+        index = it - directedEdgeSurface->vertices.begin();
+        if (it == directedEdgeSurface->vertices.end())
+            vertBCIndex = -1;
+        else
+            vertBCIndex = index;
+
+        it = std::find(directedEdgeSurface->vertices.begin(), directedEdgeSurface->vertices.end(), vertAC);
+        index = it - directedEdgeSurface->vertices.begin();
+        if (it == directedEdgeSurface->vertices.end())
+            vertACIndex = -1;
+        else
+            vertACIndex = index;
+
+
         if (vertABIndex == -1)
         {
             directedEdgeSurface->vertices.push_back(vertAB);
@@ -302,15 +294,10 @@ void RenderController::subdivideClicked()
             vertACIndex = directedEdgeSurface->vertices.size() - 1;
         }
 
-        // Flag that these were divided, with the indices of the new vertices
-        divided[faceIndex] = vertABIndex;
-        divided[faceIndex + 1] = vertBCIndex;
-        divided[faceIndex + 2] = vertACIndex;
-
         // Change the face vertex indices to the new vertices
-        directedEdgeSurface->faceVertices[faceIndex + 0] = vertABIndex;    // Subtraction from 1 to 3 to avoud going beyond the array
+        directedEdgeSurface->faceVertices[faceIndex + 0] = vertABIndex;
         directedEdgeSurface->faceVertices[faceIndex + 1] = vertBCIndex;
-        directedEdgeSurface->faceVertices[faceIndex + 2] = vertACIndex;
+        directedEdgeSurface->faceVertices[faceIndex + 2] = vertACIndex;    // Subtraction from 1 to 3 to avoud going beyond the array
 
         // Create 3 new faces at the end of the face array
         // First face, from original vertex A
@@ -328,12 +315,106 @@ void RenderController::subdivideClicked()
 
         // Create half edges for the new faces
         // 3 per face- expand by 9 as 3 halfedges will be updated
-        directedEdgeSurface->otherHalf.resize(directedEdgeSurface->otherHalf.size() + 9, -1);
+        directedEdgeSurface->otherHalf.resize(directedEdgeSurface->otherHalf.size() + 9, 0);
+    }
+    
+    // Calculating first directed edges
+    directedEdgeSurface->firstDirectedEdge.resize(directedEdgeSurface->vertices.size());
+    // Find each vertex's first occurance
+    for (unsigned int vertexIndex = 0; vertexIndex < directedEdgeSurface->vertices.size(); vertexIndex++)
+    {
+        std::vector<unsigned int>::iterator it = std::find(directedEdgeSurface->faceVertices.begin(), directedEdgeSurface->faceVertices.end(), vertexIndex);
+        int index = it - directedEdgeSurface->faceVertices.begin();
+        if (it == directedEdgeSurface->faceVertices.end())
+        {
+            // This vertex is not used
+            std::cout << "ERROR: Mesh contains a stranded vertex: " << vertexIndex << " " << directedEdgeSurface->vertices[vertexIndex] << " (it is not used on any faces)" << std::endl;
+        }
+        // Use the next index on face for first directed edge
+        // Ensures the first directed edge is pointing to another vertex on this face
+        int thisFirstDirectedEdge = (index - index % 3) + (index % 3 + 1) % 3;
+        directedEdgeSurface->firstDirectedEdge[vertexIndex] = thisFirstDirectedEdge;
+    }
 
-        // Update existing half edges to be on the central face
+    // Clear existing other halves
+    std::fill(directedEdgeSurface->otherHalf.begin(), directedEdgeSurface->otherHalf.end(), -1);
 
-        // Create new half edges to represent the split edge
+    // Track the halves that have been modified
+    std::vector<bool> otherHalfModified;
+    otherHalfModified.resize(directedEdgeSurface->otherHalf.size(), false);
 
-        // Move the existing half edges 
+    // Calculating other halves
+    for (unsigned int firstVertexIndex = 0; firstVertexIndex < directedEdgeSurface->faceVertices.size(); firstVertexIndex++)
+    {
+        // Skip this edge if it's already been modified
+        if (directedEdgeSurface->otherHalf[firstVertexIndex] >= 0)
+        {
+            continue;
+        }
+
+        // Get the index of the vertex pointing to this one
+        int firstVertexPreviousIndex = (firstVertexIndex - (firstVertexIndex % 3)) + (firstVertexIndex % 3 + 2) % 3;
+        int firstVertex = directedEdgeSurface->faceVertices[firstVertexIndex];
+        int firstVertexPrevious = directedEdgeSurface->faceVertices[firstVertexPreviousIndex];
+        // Find opposite- i.e. for edge b -> a, find edge a -> b
+        // Search the remainder of the faces- if a pair lies in the past, an edge is shared by 3 faces (non-manifold, and cannot be stored in this structure anyway)
+        for (unsigned int faceIndex = (firstVertexIndex / 3) + 1; faceIndex < directedEdgeSurface->faceVertices.size() / 3; faceIndex++)
+        {
+            // Check edge combos for this face
+            for (unsigned int i = 0; i < 3; i++)
+            {
+                int secondVertexIndex = faceIndex * 3 + i;
+                int secondVertex = directedEdgeSurface->faceVertices[secondVertexIndex];
+                int secondVertexNextIndex = faceIndex * 3 + ((i + 1) % 3);
+                int secondVertexNext = directedEdgeSurface->faceVertices[secondVertexNextIndex];
+
+                // Check if this is the opposite edge
+                if (secondVertex == firstVertex && secondVertexNext == firstVertexPrevious)
+                {
+                    // Check this edge isn't already paired- may occur if more than 2 faces to an edge
+                    if (directedEdgeSurface->otherHalf[firstVertexIndex] >= 0)
+                    {
+                        std::cout << "ERROR: Two copies of edge from " << firstVertexPrevious << " to " << firstVertex << ". Copy is on face " << (firstVertexIndex / 3) << std::endl;
+                    }
+                    // Set BOTH other halves
+                    directedEdgeSurface->otherHalf[firstVertexIndex] = secondVertexNextIndex;
+                    otherHalfModified[firstVertexIndex] = true;
+                    directedEdgeSurface->otherHalf[secondVertexNextIndex] = firstVertexIndex;
+                    otherHalfModified[secondVertexIndex] = true;
+                }
+            }
+        }
+        // If the index is still -1, a paired edge could not be found
+        if (directedEdgeSurface->otherHalf[firstVertexIndex] == -1)
+        {
+            std::cout << "ERROR: A paired edge could not be found for edge from " << firstVertexPrevious << " to " << firstVertex << " on face " << (firstVertexIndex / 3) << std::endl;
+        }
+    }
+
+    // Update the interface
+    renderWindow->ResetInterface();
+}
+
+void RenderController::writeClicked()
+{
+    // Spawn file browser to get name
+    QString fileName = QFileDialog::getSaveFileName(renderWindow, tr("Save .diredgenormal File"), "./", tr("diredgenormal files (*.diredgenormal)"));
+    if (!fileName.isEmpty())
+    {
+        // Init outstream
+        std::ofstream ofs(fileName.toStdString());
+        if (ofs.good())
+        {
+            directedEdgeSurface->WriteObjectStream(ofs);
+            QMessageBox successMsgBox;
+            successMsgBox.setText("diredgenormal file saved");
+            successMsgBox.exec();
+        }
+        else
+        {
+            QMessageBox failMsgBox;
+            failMsgBox.setText("Could not save file");
+            failMsgBox.exec();
+        }
     }
 }

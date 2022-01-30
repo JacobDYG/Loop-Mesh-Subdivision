@@ -63,7 +63,7 @@ class DirectedEdgeSurface
     std::vector<unsigned int> faceVertices;
 
 	// vector of other half edge IDs
-	std::vector<unsigned int> otherHalf;
+	std::vector<int> otherHalf;
 
     // centre of gravity - computed after reading
     Cartesian3 centreOfGravity;

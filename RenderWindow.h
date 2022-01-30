@@ -75,6 +75,9 @@ class RenderWindow : public QWidget
     // subdivide controls
     QPushButton                 *subdivideButton;
 
+    // writeout
+    QPushButton                 *writeButton;
+
     public:
     // constructor
     RenderWindow

@@ -89,6 +89,9 @@ class RenderController : public QObject
     // subdivision
     void subdivideClicked();
 
+    // writeout
+    void writeClicked();
+
     }; // class RenderController
 
 // end of include guard

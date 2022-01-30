@@ -238,7 +238,7 @@ void DirectedEdgeSurface::WriteObjectStream(std::ostream &geometryStream)
     // and the faces - increment is taken care of internally
     for (unsigned int face = 0; face < faceVertices.size(); )
         { // per face
-        geometryStream << "Face " << face << " ";
+        geometryStream << "Face " << face / 3 << " ";
         
         // read in three vertices
         geometryStream << faceVertices[face++] << " ";
