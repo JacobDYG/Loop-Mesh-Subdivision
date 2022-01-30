@@ -223,6 +223,50 @@ void RenderController::subdivideClicked()
 
     size_t startFaceLength = directedEdgeSurface->faceVertices.size();
 
+    std::vector<Cartesian3> newPositions;
+    std::vector<Cartesian3> newNormals;
+    newPositions.reserve(directedEdgeSurface->vertices.size());
+
+    // Calculate new positions for old vertices, but do not apply yet
+    // Count the degree of each vertex
+    std::vector<int> degrees(directedEdgeSurface->vertices.size(), 0);
+    for (int index : directedEdgeSurface->faceVertices)
+    {
+        degrees[index]++;
+    }
+
+    // Calculate new positions
+    for (size_t vertIndex = 0; vertIndex < directedEdgeSurface->vertices.size(); vertIndex++)
+    {
+        Cartesian3 neighbourVertSum;
+        Cartesian3 neighbourNormSum;
+        // Get the FDE of each vertex, and traverse around it: edge1 -> edge1otherhalf -> next -> nextotherhalf..... until at start
+        int startEdge = directedEdgeSurface->firstDirectedEdge[vertIndex];
+        int edge = startEdge;
+        do
+        {
+            neighbourVertSum = neighbourVertSum + directedEdgeSurface->vertices[directedEdgeSurface->faceVertices[edge]];
+            neighbourNormSum = neighbourNormSum + directedEdgeSurface->normals[directedEdgeSurface->faceVertices[edge]];
+            edge = ((directedEdgeSurface->otherHalf[edge] - directedEdgeSurface->otherHalf[edge] % 3) + (directedEdgeSurface->otherHalf[edge] % 3 + 1) % 3);
+        } while (edge != startEdge);
+
+        float u;
+        if (degrees[vertIndex] == 3)
+        {
+            u = 3.0 / 16.0;
+        }
+        else
+        {
+            u = 3.0 / (8.0 * (float)degrees[vertIndex]);
+        }
+        Cartesian3 newPos = (1.0 - (float)degrees[vertIndex] * u) * directedEdgeSurface->vertices[vertIndex] + u * neighbourVertSum;
+        Cartesian3 newNorm = (1.0 - (float)degrees[vertIndex] * u) * directedEdgeSurface->normals[vertIndex] + u * neighbourVertSum;
+        newPositions.push_back(newPos);
+    }
+
+    std::vector<unsigned int> newIndices;
+    newIndices.resize(directedEdgeSurface->faceVertices.size());
+
     // Loop through all the faces. Subdivide all at once.
     for (size_t faceIndex = 0; faceIndex < startFaceLength; faceIndex+=3)
     {
@@ -232,91 +276,111 @@ void RenderController::subdivideClicked()
         unsigned int startVertCIndex = directedEdgeSurface->faceVertices[faceIndex + 2];
         
         // Create 3 new vertices and corresponding normals
-        Cartesian3 vertAB = directedEdgeSurface->vertices[startVertAIndex] * 0.5 
-                            + directedEdgeSurface->vertices[startVertBIndex] * 0.5;
-        Cartesian3 normAB = directedEdgeSurface->normals[startVertAIndex] * 0.5
-                            + directedEdgeSurface->normals[startVertBIndex] * 0.5;
+        /*Cartesian3 vertAB = (directedEdgeSurface->vertices[startVertAIndex] 
+                            + directedEdgeSurface->vertices[startVertBIndex]) * 3.0 / 8.0
+                            + (directedEdgeSurface->vertices[startVertCIndex]
+                            + directedEdgeSurface->vertices[directedEdgeSurface->faceVertices[directedEdgeSurface->otherHalf[faceIndex + 1] + 1]]) * 1.0 / 8.0;*/
 
-        Cartesian3 vertBC = directedEdgeSurface->vertices[startVertBIndex] * 0.5
-                            + directedEdgeSurface->vertices[startVertCIndex] * 0.5;
-        Cartesian3 normBC = directedEdgeSurface->normals[startVertBIndex] * 0.5
-                            + directedEdgeSurface->normals[startVertCIndex] * 0.5;
 
-        Cartesian3 vertAC = directedEdgeSurface->vertices[startVertAIndex] * 0.5 
+        Cartesian3 vertAC = directedEdgeSurface->vertices[startVertAIndex] * 0.5
                             + directedEdgeSurface->vertices[startVertCIndex] * 0.5;
         Cartesian3 normAC = directedEdgeSurface->normals[startVertAIndex] * 0.5
                             + directedEdgeSurface->normals[startVertCIndex] * 0.5;
 
+        /*Cartesian3 vertBC = (directedEdgeSurface->vertices[startVertBIndex] 
+                            + directedEdgeSurface->vertices[startVertCIndex]) * 3.0 / 8.0
+                            + (directedEdgeSurface->vertices[startVertAIndex]
+                            + directedEdgeSurface->vertices[directedEdgeSurface->faceVertices[directedEdgeSurface->otherHalf[faceIndex + 1] + 1]]) * 1.0 / 8.0;*/
+
+
+        Cartesian3 vertBA = directedEdgeSurface->vertices[startVertBIndex] * 0.5
+                            + directedEdgeSurface->vertices[startVertAIndex] * 0.5;
+        Cartesian3 normBA = directedEdgeSurface->normals[startVertBIndex] * 0.5
+                            + directedEdgeSurface->normals[startVertAIndex] * 0.5;
+
+        /*Cartesian3 vertAC = (directedEdgeSurface->vertices[startVertAIndex] 
+                            + directedEdgeSurface->vertices[startVertCIndex]) * 3.0 / 8.0
+                            + (directedEdgeSurface->vertices[startVertBIndex]
+                            + directedEdgeSurface->vertices[directedEdgeSurface->faceVertices[directedEdgeSurface->otherHalf[faceIndex + 1] + 1]]) * 1.0 / 8.0;*/
+
+
+        Cartesian3 vertCB = directedEdgeSurface->vertices[startVertCIndex] * 0.5
+                            + directedEdgeSurface->vertices[startVertBIndex] * 0.5;
+        Cartesian3 normCB = directedEdgeSurface->normals[startVertCIndex] * 0.5
+                            + directedEdgeSurface->normals[startVertBIndex] * 0.5;
+
         // Add the vertices, or get indices of already placed
-        int vertABIndex, vertBCIndex, vertACIndex;
+        int vertACIndex, vertBAIndex, vertCBIndex;
 
-        std::vector<Cartesian3>::iterator it;
-        int index;
+        vertACIndex = divided[faceIndex + 0];
+        vertBAIndex = divided[faceIndex + 1];
+        vertCBIndex = divided[faceIndex + 2];
 
-        it = std::find(directedEdgeSurface->vertices.begin(), directedEdgeSurface->vertices.end(), vertAB);
-        index = it - directedEdgeSurface->vertices.begin();
-        if (it == directedEdgeSurface->vertices.end())
-            vertABIndex = -1;
-        else
-            vertABIndex = index;
-
-        it = std::find(directedEdgeSurface->vertices.begin(), directedEdgeSurface->vertices.end(), vertBC);
-        index = it - directedEdgeSurface->vertices.begin();
-        if (it == directedEdgeSurface->vertices.end())
-            vertBCIndex = -1;
-        else
-            vertBCIndex = index;
-
-        it = std::find(directedEdgeSurface->vertices.begin(), directedEdgeSurface->vertices.end(), vertAC);
-        index = it - directedEdgeSurface->vertices.begin();
-        if (it == directedEdgeSurface->vertices.end())
-            vertACIndex = -1;
-        else
-            vertACIndex = index;
-
-
-        if (vertABIndex == -1)
-        {
-            directedEdgeSurface->vertices.push_back(vertAB);
-            directedEdgeSurface->normals.push_back(normAB);
-            vertABIndex = directedEdgeSurface->vertices.size() - 1;
-        }
-        if (vertBCIndex == -1)
-        {
-            directedEdgeSurface->vertices.push_back(vertBC);
-            directedEdgeSurface->normals.push_back(normBC);
-            vertBCIndex = directedEdgeSurface->vertices.size() - 1;
-        }
         if (vertACIndex == -1)
         {
             directedEdgeSurface->vertices.push_back(vertAC);
             directedEdgeSurface->normals.push_back(normAC);
             vertACIndex = directedEdgeSurface->vertices.size() - 1;
         }
+        if (vertBAIndex == -1)
+        {
+            directedEdgeSurface->vertices.push_back(vertBA);
+            directedEdgeSurface->normals.push_back(normBA);
+            vertBAIndex = directedEdgeSurface->vertices.size() - 1;
+        }
+        if (vertCBIndex == -1)
+        {
+            directedEdgeSurface->vertices.push_back(vertCB);
+            directedEdgeSurface->normals.push_back(normCB);
+            vertCBIndex = directedEdgeSurface->vertices.size() - 1;
+        }
+
+        // Mark this and other half
+        divided[faceIndex + 0] = vertACIndex;
+        divided[faceIndex + 1] = vertBAIndex;
+        divided[faceIndex + 2] = vertCBIndex;
+
+
+        divided[directedEdgeSurface->otherHalf[faceIndex + 0]] = vertACIndex;
+        divided[directedEdgeSurface->otherHalf[faceIndex + 1]] = vertBAIndex;
+        divided[directedEdgeSurface->otherHalf[faceIndex + 2]] = vertCBIndex;
 
         // Change the face vertex indices to the new vertices
-        directedEdgeSurface->faceVertices[faceIndex + 0] = vertABIndex;
-        directedEdgeSurface->faceVertices[faceIndex + 1] = vertBCIndex;
-        directedEdgeSurface->faceVertices[faceIndex + 2] = vertACIndex;    // Subtraction from 1 to 3 to avoud going beyond the array
+        newIndices[faceIndex + 0] = vertACIndex;
+        newIndices[faceIndex + 1] = vertBAIndex;
+        newIndices[faceIndex + 2] = vertCBIndex;
 
         // Create 3 new faces at the end of the face array
         // First face, from original vertex A
-        directedEdgeSurface->faceVertices.push_back(startVertAIndex);
-        directedEdgeSurface->faceVertices.push_back(vertABIndex);   // Vertex on edge AB
-        directedEdgeSurface->faceVertices.push_back(vertACIndex);   // Vertex on edge AC
-        // Second face, from original vertex B
-        directedEdgeSurface->faceVertices.push_back(startVertBIndex);
-        directedEdgeSurface->faceVertices.push_back(vertBCIndex);   // Vertex on edge BC
-        directedEdgeSurface->faceVertices.push_back(vertABIndex);   // Vertex on edge AB
-        // Third face, from original vertex C
         directedEdgeSurface->faceVertices.push_back(startVertCIndex);
-        directedEdgeSurface->faceVertices.push_back(vertACIndex);   // Vertex on edge AC
-        directedEdgeSurface->faceVertices.push_back(vertBCIndex);   // Vertex on edge BC
+        directedEdgeSurface->faceVertices.push_back(vertACIndex);   // Vertex on edge AB
+        directedEdgeSurface->faceVertices.push_back(vertCBIndex);   // Vertex on edge AC
+        // Second face, from original vertex B
+        directedEdgeSurface->faceVertices.push_back(startVertAIndex);
+        directedEdgeSurface->faceVertices.push_back(vertBAIndex);   // Vertex on edge BC
+        directedEdgeSurface->faceVertices.push_back(vertACIndex);   // Vertex on edge AB
+        // Third face, from original vertex C
+        directedEdgeSurface->faceVertices.push_back(startVertBIndex);
+        directedEdgeSurface->faceVertices.push_back(vertCBIndex);   // Vertex on edge AC
+        directedEdgeSurface->faceVertices.push_back(vertBAIndex);   // Vertex on edge BC
 
         // Create half edges for the new faces
         // 3 per face- expand by 9 as 3 halfedges will be updated
         directedEdgeSurface->otherHalf.resize(directedEdgeSurface->otherHalf.size() + 9, 0);
     }
+
+    // Apply changes to old
+    for (size_t i = 0; i < newPositions.size(); i++)
+    {
+        directedEdgeSurface->vertices[i] = newPositions[i];
+    }
+
+    for (size_t i = 0; i < newIndices.size(); i++)
+    {
+        directedEdgeSurface->faceVertices[i] = newIndices[i];
+    }
+
+    // Apply changes to new
     
     // Calculating first directed edges
     directedEdgeSurface->firstDirectedEdge.resize(directedEdgeSurface->vertices.size());
@@ -338,10 +402,6 @@ void RenderController::subdivideClicked()
 
     // Clear existing other halves
     std::fill(directedEdgeSurface->otherHalf.begin(), directedEdgeSurface->otherHalf.end(), -1);
-
-    // Track the halves that have been modified
-    std::vector<bool> otherHalfModified;
-    otherHalfModified.resize(directedEdgeSurface->otherHalf.size(), false);
 
     // Calculating other halves
     for (unsigned int firstVertexIndex = 0; firstVertexIndex < directedEdgeSurface->faceVertices.size(); firstVertexIndex++)
@@ -378,9 +438,7 @@ void RenderController::subdivideClicked()
                     }
                     // Set BOTH other halves
                     directedEdgeSurface->otherHalf[firstVertexIndex] = secondVertexNextIndex;
-                    otherHalfModified[firstVertexIndex] = true;
                     directedEdgeSurface->otherHalf[secondVertexNextIndex] = firstVertexIndex;
-                    otherHalfModified[secondVertexIndex] = true;
                 }
             }
         }
